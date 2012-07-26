@@ -1,0 +1,9 @@
+{
+	"routing": [
+		{
+			"pattern": "/",
+			"handler_file": "src/HomeHandler.php",
+			"handler_class": "HomeHandler"
+		}
+	]
+}

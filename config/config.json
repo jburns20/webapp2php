@@ -1,0 +1,13 @@
+{
+	"mysql": {
+		"host": "localhost",
+		"username": "root",
+		"password": "root",
+		"database": "my_site_db",
+		"port": 3306
+	},
+	"twig": {
+		"cache_on": false,
+		"cache_dir": "src/templates/twig_cache"
+	}
+}
