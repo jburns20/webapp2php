@@ -4,7 +4,6 @@
 			"pattern": "/",
 			"handler_file": "app/HomeHandler.php",
 			"handler_class": "HomeHandler"
-		},
-		{
+		}
 	]
 }

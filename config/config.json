@@ -1,4 +1,5 @@
 {
+	"debug_mode": false,
 	"mysql": {
 		"host": "localhost",
 		"username": "root",
@@ -8,6 +9,6 @@
 	},
 	"twig": {
 		"cache_on": false,
-		"cache_dir": "src/templates/twig_cache"
+		"cache_dir": "app/templates/twig_cache"
 	}
 }
