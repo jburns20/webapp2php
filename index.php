@@ -1,7 +1,7 @@
 <?php
 require_once "framework/ALL.php";
 
-$debug = FALSE;
+$debug = TRUE;
 $begintime = microtime(true);
 
 $routing_table = json_decode(file_get_contents("config/routing.json"), TRUE);
@@ -24,6 +24,10 @@ $request->request_params = $params;
 $request->file_params = $_FILES;
 error_log($request->method . " " . $request->path);
 $config = json_decode(file_get_contents("config/config.json"), TRUE);
+if ($config == NULL) {
+	error_log("ERROR: The config table is misconfigured.");
+	die();
+}
 $mysql_setup  = $config['mysql'];
 R::setup('mysql:host=' . $mysql_setup['host'] . ';dbname=' . $mysql_setup['database'], $mysql_setup['username'], $mysql_setup['password']);
 
@@ -36,36 +40,47 @@ foreach ($routing_table['routing'] as $rule) {
 		$match_found = TRUE;
 		array_shift($matches);
 		$request->path_params = $matches;
-		require_once $rule['handler_file'];
-		$instance = new $rule['handler_class']($request);
-		if ($request->method == "POST") {
-			$instance->post();
-		} else {
-			$instance->get();
-		}
-		$response = $instance->response;
-		if ($response->response_code != null) {
-			header($response->response_code);
-		} else {
-			$response->response_code = "HTTP/1.0 200";
-		}
-		foreach(($response->cookies) as $cookie) {
-			setcookie($cookie['name'],
-					  $cookie['value'],
-					  $cookie['expire'],
-					  $cookie['path'],
-					  $cookie['domain'],
-					  $cookie['secure'],
-					  $cookie['httponly']);
-		}
-		foreach(($response->headers) as $header) {
-			header($header['key'] . ": " . $header['value']);
-			if ($header['key'] == "Location") {
-				$response->response_code = "HTTP/1.0 302";
+		if (array_key_exists('static_file', $rule)) {
+			$contents = file_get_contents($rule['static_file']);
+			if (array_key_exists('static_type', $rule)) {
+				$type = $rule['static_type'];
+			} else {
+				$type = mime_content_type($rule['static_file']);
 			}
+			header("Content-Type: " . $type);
+			echo $contents;
+		} else {
+			require_once $rule['handler_file'];
+			$instance = new $rule['handler_class']($request);
+			if ($request->method == "POST") {
+				$instance->post();
+			} else {
+				$instance->get();
+			}
+			$response = $instance->response;
+			if ($response->response_code != null) {
+				header($response->response_code);
+			} else {
+				$response->response_code = "HTTP/1.0 200";
+			}
+			foreach(($response->cookies) as $cookie) {
+				setcookie($cookie['name'],
+						  $cookie['value'],
+						  $cookie['expire'],
+						  $cookie['path'],
+						  $cookie['domain'],
+						  $cookie['secure'],
+						  $cookie['httponly']);
+			}
+			foreach(($response->headers) as $header) {
+				header($header['key'] . ": " . $header['value']);
+				if ($header['key'] == "Location") {
+					$response->response_code = "HTTP/1.0 302";
+				}
+			}
+			error_log($response->response_code);
+			echo $response->contents;
 		}
-		error_log($response->response_code);
-		echo $response->contents;
 		break;
 	}
 }
@@ -85,8 +100,11 @@ if ($debug) {
 	echo "path: " . ($request->path) . "<br>\n";
 	echo "method: " . ($request->method) . "<br>\n";
 	echo "useragent: " . ($request->useragent) . "<br>\n";
-	echo "params: <br>\n";
+	echo "referer: " . ($request->referer) . "<br>\n";
+	echo "request params: <br>\n";
 	$param_string = var_dump($request->request_params);
+	echo "<br>\npath params: <br>\n";
+	$param_string = var_dump($request->path_params);
 	echo $param_string;
 }
 

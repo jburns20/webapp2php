@@ -9,7 +9,7 @@ class Handler {
 		$this->request = $request;
 		$this->response = new Response();
 		Twig_Autoloader::register();
-		$loader_file = new Twig_Loader_Filesystem('src/templates');
+		$loader_file = new Twig_Loader_Filesystem('app/templates');
 		$loader_str = new Twig_Loader_String();
 		$config = json_decode(file_get_contents("config/config.json"), TRUE);
 		$twig_setup  = $config['twig'];
