@@ -30,11 +30,13 @@ $begintime = microtime(true);
 
 $routing_table = json_decode(file_get_contents("config/routing.json"), TRUE);
 if ($routing_table == NULL) {
-	error_log("ERROR: The routing table is misconfigured.");
-	die();
+	throw new Exception("webapp2php ERROR: The routing table is misconfigured.");
 }
 $request = new Request();
 $request->path = $_SERVER['PATH_INFO'];
+if ($request->path == null || $request->path == "") {
+	$request->path = $_SERVER['ORIG_PATH_INFO'];
+}
 $request->useragent = $_SERVER['HTTP_USER_AGENT'];
 $request->method = $_SERVER['REQUEST_METHOD'];
 if (array_key_exists("HTTP_REFERER", $_SERVER)) {
@@ -49,7 +51,7 @@ $request->file_params = $_FILES;
 error_log($request->method . " " . $request->path);
 $config = json_decode(file_get_contents("config/config.json"), TRUE);
 if ($config == NULL) {
-	error_log("ERROR: The config table is misconfigured.");
+	throw new Exception("webapp2php ERROR: The config table is misconfigured.");
 	die();
 }
 $debug = $config['debug_mode'];
@@ -75,7 +77,13 @@ foreach ($routing_table['routing'] as $rule) {
 			header("Content-Type: " . $type);
 			echo $contents;
 		} else {
+			if (!file_exists($rule['handler_file'])) {
+				throw new Exception("webapp2php ERROR: The handler file \"" . $rule['handler_file'] . "\" does not exist.");
+			}
 			require_once $rule['handler_file'];
+			if (!class_exists($rule['handler_class'])) {
+				throw new Exception("webapp2php ERROR: The handler class \"" . $rule['handler_class'] . "\" does not exist.");
+			}
 			$instance = new $rule['handler_class']($request);
 			if ($request->method == "POST") {
 				$instance->post();
