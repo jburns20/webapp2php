@@ -61,6 +61,14 @@ class Response {
 	}
 	
 	public function error($number) {
-		$this->response_code = "HTTP/1.0 " . $number;
+		$this->response_code = "HTTP/1.1 " . $number;
+	}
+	
+	public function reset() {
+		$this->contents = "";
+		$this->headers = array();
+		$this->cookies = array();
+		$this->error = null;
+		$this->response_code = null;
 	}
 }

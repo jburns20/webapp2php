@@ -24,14 +24,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-require_once "framework/ALL.php";
-
 $begintime = microtime(true);
 
-$routing_table = json_decode(file_get_contents("config/routing.json"), TRUE);
-if ($routing_table == NULL) {
-	throw new Exception("webapp2php ERROR: The routing table is misconfigured.");
-}
+require_once "framework/ALL.php";
+
+global $CONFIG;
+$CONFIG = array();
+require("config/config.php");
+$debug = $CONFIG['debug_mode'];
+R::setup('mysql:host=' . $CONFIG['mysql_host'] . ';dbname=' . $CONFIG['mysql_database'], $CONFIG['mysql_username'], $CONFIG['mysql_password']);
+
 $request = new Request();
 $request->path = $_SERVER['PATH_INFO'];
 if ($request->path == null || $request->path == "") {
@@ -48,20 +50,16 @@ $params = array_merge($_GET, $_POST);
 $request->cookies = $_COOKIE;
 $request->request_params = $params;
 $request->file_params = $_FILES;
-error_log($request->method . " " . $request->path);
-$config = json_decode(file_get_contents("config/config.json"), TRUE);
-if ($config == NULL) {
-	throw new Exception("webapp2php ERROR: The config table is misconfigured.");
-	die();
-}
-$debug = $config['debug_mode'];
-$mysql_setup  = $config['mysql'];
-R::setup('mysql:host=' . $mysql_setup['host'] . ';dbname=' . $mysql_setup['database'], $mysql_setup['username'], $mysql_setup['password']);
+if ($CONFIG["log_requests"]) error_log($request->method . " " . $request->path);
+
+$ROUTING = array();
+$ERRORPAGE = array();
+require("config/routing.php");
 
 $match_found = FALSE;
-foreach ($routing_table['routing'] as $rule) {
-	$pattern = "%^" . $rule['pattern'] . "$%";
-	preg_match($pattern, ($request->path), $matches);
+foreach ($ROUTING as $pattern => $rule) {
+	$pattern = "%^" . $pattern . "$%";
+	preg_match($pattern, $request->path, $matches);
 	
 	if (count($matches) > 0 && $matches[0] == $request->path) {
 		$match_found = TRUE;
@@ -84,7 +82,7 @@ foreach ($routing_table['routing'] as $rule) {
 			if (!class_exists($rule['handler_class'])) {
 				throw new Exception("webapp2php ERROR: The handler class \"" . $rule['handler_class'] . "\" does not exist.");
 			}
-			$instance = new $rule['handler_class']($request);
+			$instance = new $rule['handler_class']($request, $rule);
 			if ($request->method == "POST") {
 				$instance->post();
 			} else {
@@ -94,9 +92,9 @@ foreach ($routing_table['routing'] as $rule) {
 			if ($response->response_code != null) {
 				header($response->response_code);
 			} else {
-				$response->response_code = "HTTP/1.0 200";
+				$response->response_code = "HTTP/1.1 200";
 			}
-			foreach(($response->cookies) as $cookie) {
+			foreach($response->cookies as $cookie) {
 				setcookie($cookie['name'],
 						  $cookie['value'],
 						  $cookie['expire'],
@@ -105,21 +103,21 @@ foreach ($routing_table['routing'] as $rule) {
 						  $cookie['secure'],
 						  $cookie['httponly']);
 			}
-			foreach(($response->headers) as $header) {
+			foreach($response->headers as $header) {
 				header($header['key'] . ": " . $header['value']);
 				if ($header['key'] == "Location") {
-					$response->response_code = "HTTP/1.0 302";
+					$response->response_code = "HTTP/1.1 302";
 				}
 			}
-			error_log($response->response_code);
+			if ($CONFIG["log_requests"]) error_log($response->response_code);
 			echo $response->contents;
 		}
 		break;
 	}
 }
 if (!$match_found) {
-	header("HTTP/1.0 404");
-	error_log("HTTP/1.0 404");
+	header("HTTP/1.1 404");
+	error_log("HTTP/1.1 404");
 	echo "<h1>Error 404: File Not Found.</h1>";
 }
 R::close();
@@ -129,15 +127,23 @@ $totaltime = ($endtime - $begintime)*1000;
 
 if ($debug) {
 	echo "\n<hr>\n";
-	echo "request took " . $totaltime . " milliseconds.<br>\n";
-	echo "path: " . ($request->path) . "<br>\n";
-	echo "method: " . ($request->method) . "<br>\n";
-	echo "useragent: " . ($request->useragent) . "<br>\n";
-	echo "referer: " . ($request->referer) . "<br>\n";
-	echo "request params: <br>\n";
-	$param_string = var_dump($request->request_params);
-	echo "<br>\npath params: <br>\n";
-	$param_string = var_dump($request->path_params);
-	echo $param_string;
+	echo "request took " . intval($totaltime)/1000 . " seconds.<br>\n";
+	echo "<table class='debug'><tbody>";
+	echo "<tr><td>path</td><td>" . ($request->path) . "</td></tr>\n";
+	echo "<tr><td>method</td><td>" . ($request->method) . "</td></tr>\n";
+	echo "<tr><td>useragent</td><td>" . ($request->useragent) . "</td></tr>\n";
+	echo "<tr><td>referer</td><td>" . ($request->referer) . "</td></tr>\n";
+	echo "<tr><td>request params</td>\n<td>";
+	echo var_export($request->request_params, true);
+	echo "</tr>\n<tr><td>path params</td>\n<td>";
+	echo var_export($request->path_params, true);
+	echo "</tr>\n<tr><td>file params</td>\n<td>";
+	echo var_export($request->file_params, true);
+	echo "</tr>\n<tr><td>request cookies</td>\n<td>";
+	echo var_export($request->cookies, true);
+	echo "</tr>\n<tr><td>response cookies</td>\n<td>";
+	echo var_export($response->cookies, true);
+	echo "</td></tr></tbody></table>";
+	echo "<style>.debug td {border: 1px solid #CCC; padding: 2px;} .debug {border-collapse: collapse;}</style>";
 }
 

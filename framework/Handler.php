@@ -29,27 +29,27 @@ class Handler {
 	public $response;
 	private $twig;
 	
-	function __construct($request) {
+	function __construct($request, $rule) {
 		$this->request = $request;
+		$this->rule = $rule;
 		$this->response = new Response();
 		Twig_Autoloader::register();
-		$loader_file = new Twig_Loader_Filesystem('app/templates');
+		$loader_file = new Twig_Loader_Filesystem('app/view');
 		$loader_str = new Twig_Loader_String();
-		$config = json_decode(file_get_contents("config/config.json"), TRUE);
-		$twig_setup  = $config['twig'];
-		if ($twig_setup['cache_on']) {
-			$this->twig_file = new Twig_Environment($loader_file, array('cache' => $twig_setup['cache_dir']));
-			$this->twig_str = new Twig_Environment($loader_str, array('cache' => $twig_setup['cache_dir']));
+		global $CONFIG;
+		if ($CONFIG['twig_cache']) {
+			$this->twig_file = new Twig_Environment($loader_file, array('cache' => $CONFIG['twig_cache_dir']));
+			$this->twig_str = new Twig_Environment($loader_str, array('cache' => $CONFIG['twig_cache_dir']));
 		} else {
 			$this->twig_file = new Twig_Environment($loader_file, array());
 			$this->twig_str = new Twig_Environment($loader_str, array());
 		}
 	}
-	public function get($request) {
+	public function get() {
 		$this->response->error(405);
 		$this->write("<h1>Error 405: Method \"GET\" not allowed.</h1>");
 	}
-	public function post($request) {
+	public function post() {
 		$this->response->error(405);
 		$this->write("<h1>Error 405: Method \"POST\" not allowed.</h1>");
 	}
@@ -74,5 +74,23 @@ class Handler {
 	public function render_write_file($filename, $params) {
 		$output = $this->render_file($filename, $params);
 		$this->write($output);
+	}
+	
+	public function use_handler($handler_file, $handler_class, $method = "GET", $reset = true) {
+		if ($reset) $this->response->reset();
+		if (!file_exists($handler_file)) {
+			throw new Exception("webapp2php ERROR: The handler file \"" . $handler_file . "\" does not exist.");
+		}
+		require_once($handler_file);
+		if (!class_exists($handler_class)) {
+			throw new Exception("webapp2php ERROR: The handler class \"" . $handler_class . "\" does not exist.");
+		}
+		$instance = new $handler_class($this->request, $this->rule);
+		$instance->response = $this->response;
+		if ($method == "POST") {
+			$instance->post();
+		} else {
+			$instance->get();
+		}
 	}
 }
