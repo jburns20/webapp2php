@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+{% set title = 'Sign Up' %}
+{% include 'head.twig' %}
+<body>
+{% include 'header.twig' %}
+<div id="content">
+<h1>Sign Up for an Account</h1>
+<p style="color: red;">{{message}}</p>
+<form method="POST">
+<p>
+<label>Email:
+<input type="text" name="email"></label>
+</p><p>
+<label>Password: 
+<input type="password" name="password"></label>
+</p><p>
+<label>Repeat Password: 
+<input type="password" name="password2"></label>
+</p><p>
+<input type="submit">
+</p>
+</form>
+</div>
+</body></html>

@@ -24,10 +24,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use RedBeanPHP\R;
+
 class Handler {
 	public $request;
 	public $response;
+	public $rule;
 	private $twig;
+	public $user;
 	
 	function __construct($request, $rule) {
 		$this->request = $request;
@@ -44,6 +48,13 @@ class Handler {
 			$this->twig_file = new Twig_Environment($loader_file, array());
 			$this->twig_str = new Twig_Environment($loader_str, array());
 		}
+		
+		$cookie = explode("|",$this->request->cookies['auth']);
+		$this->user = null;
+		$acct = R::findOne("user", " email = ? ", array($cookie[0]));
+		if ($acct!=null && $cookie[1] == $acct->cookie) {
+			$this->user = $acct;
+		}
 	}
 	public function get() {
 		$this->response->error(405);
@@ -53,6 +64,9 @@ class Handler {
 		$this->response->error(405);
 		$this->write("<h1>Error 405: Method \"POST\" not allowed.</h1>");
 	}
+	public function is_logged_in() {
+		return ($this->user != null);
+	}
 	public function write($text) {
 		$this->response->write($text);
 	}
@@ -60,11 +74,11 @@ class Handler {
 		$this->render_write_file($filename, array());
 	}
 	public function render($text, $params) {
-		//$params['user'] = $this->user;
+		$params['user'] = $this->user;
 		return $this->twig_str->render($text, $params);
 	}
 	public function render_file($filename, $params) {
-		//$params['user'] = $this->user;
+		$params['user'] = $this->user;
 		return $this->twig_file->render($filename, $params);
 	}
 	public function render_write($text, $params) {

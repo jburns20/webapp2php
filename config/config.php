@@ -12,7 +12,7 @@ $CONFIG["mysql_host"] = "localhost";
 $CONFIG["mysql_username"] = "root";
 $CONFIG["mysql_password"] = "root";
 $CONFIG["mysql_database"] = "webapp";
-$CONFIG["mysql_port"] = 8889;
+$CONFIG["mysql_port"] = 3306;
 
 $CONFIG["twig_cache"] = false;
 $CONFIG["twig_cache_dir"] = "cache/twig";

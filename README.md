@@ -10,6 +10,15 @@ class HomeHandler extends Handler {
 }
 ```
 
-Includes [Twig](http://twig.sensiolabs.org) as a template engine and [RedBeanPHP](http://www.redbeanphp) as an ORM.
+Uses [Twig](http://twig.sensiolabs.org) as a template engine and [RedBeanPHP](http://www.redbeanphp) as an ORM.
 
 Licensed under the New BSD License.
+
+##Setup
+Copy all the files into your web root (usually this is the `public_html` directory). Make sure the .htaccess files are copied properly. Then run the following command:
+```
+php composer.phar install
+```
+Add the MySQL database, username, and password in `config/config.php` to configure the database connection.
+That's it! Open a web browser to test that everything is working.
+

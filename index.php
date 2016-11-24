@@ -25,17 +25,22 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 $begintime = microtime(true);
-
+require_once "vendor/autoload.php";
 require_once "framework/ALL.php";
+
+use RedBeanPHP\R;
 
 global $CONFIG;
 $CONFIG = array();
-require("config/config.php");
+require_once("config/config.php");
 $debug = $CONFIG['debug_mode'];
 R::setup('mysql:host=' . $CONFIG['mysql_host'] . ';dbname=' . $CONFIG['mysql_database'], $CONFIG['mysql_username'], $CONFIG['mysql_password']);
 
 $request = new Request();
+$request->path = "";
+if (isset($_SERVER['PATH_INFO'])) {
 $request->path = $_SERVER['PATH_INFO'];
+}
 if ($request->path == null || $request->path == "") {
 	$request->path = $_SERVER['ORIG_PATH_INFO'];
 }
@@ -54,7 +59,58 @@ if ($CONFIG["log_requests"]) error_log($request->method . " " . $request->path);
 
 $ROUTING = array();
 $ERRORPAGE = array();
-require("config/routing.php");
+require_once("config/routing.php");
+
+function handle_with_rule($request, $rule) {
+    global $CONFIG;
+    if (array_key_exists('static_file', $rule)) {
+        $contents = file_get_contents($rule['static_file']);
+        if (array_key_exists('static_type', $rule)) {
+            $type = $rule['static_type'];
+        } else {
+            $type = mime_content_type($rule['static_file']);
+        }
+        header("Content-Type: " . $type);
+        echo $contents;
+    } else {
+        if (!file_exists($rule['handler_file'])) {
+            throw new Exception("webapp2php ERROR: The handler file \"" . $rule['handler_file'] . "\" does not exist.");
+        }
+        require_once $rule['handler_file'];
+        if (!class_exists($rule['handler_class'])) {
+            throw new Exception("webapp2php ERROR: The handler class \"" . $rule['handler_class'] . "\" does not exist.");
+        }
+        $instance = new $rule['handler_class']($request, $rule);
+        if ($request->method == "POST") {
+            $instance->post();
+        } else {
+            $instance->get();
+        }
+        $response = $instance->response;
+        if ($response->response_code != null) {
+            header($response->response_code);
+        } else {
+            $response->response_code = "HTTP/1.1 200";
+        }
+        foreach($response->cookies as $cookie) {
+            setcookie($cookie['name'],
+                      $cookie['value'],
+                      $cookie['expire'],
+                      $cookie['path'],
+                      $cookie['domain'],
+                      $cookie['secure'],
+                      $cookie['httponly']);
+        }
+        foreach($response->headers as $header) {
+            header($header['key'] . ": " . $header['value']);
+            if ($header['key'] == "Location") {
+                $response->response_code = "HTTP/1.1 302";
+            }
+        }
+        if ($CONFIG["log_requests"]) error_log($response->response_code);
+        echo $response->contents;
+    }
+}
 
 $match_found = FALSE;
 foreach ($ROUTING as $pattern => $rule) {
@@ -65,60 +121,13 @@ foreach ($ROUTING as $pattern => $rule) {
 		$match_found = TRUE;
 		array_shift($matches);
 		$request->path_params = $matches;
-		if (array_key_exists('static_file', $rule)) {
-			$contents = file_get_contents($rule['static_file']);
-			if (array_key_exists('static_type', $rule)) {
-				$type = $rule['static_type'];
-			} else {
-				$type = mime_content_type($rule['static_file']);
-			}
-			header("Content-Type: " . $type);
-			echo $contents;
-		} else {
-			if (!file_exists($rule['handler_file'])) {
-				throw new Exception("webapp2php ERROR: The handler file \"" . $rule['handler_file'] . "\" does not exist.");
-			}
-			require_once $rule['handler_file'];
-			if (!class_exists($rule['handler_class'])) {
-				throw new Exception("webapp2php ERROR: The handler class \"" . $rule['handler_class'] . "\" does not exist.");
-			}
-			$instance = new $rule['handler_class']($request, $rule);
-			if ($request->method == "POST") {
-				$instance->post();
-			} else {
-				$instance->get();
-			}
-			$response = $instance->response;
-			if ($response->response_code != null) {
-				header($response->response_code);
-			} else {
-				$response->response_code = "HTTP/1.1 200";
-			}
-			foreach($response->cookies as $cookie) {
-				setcookie($cookie['name'],
-						  $cookie['value'],
-						  $cookie['expire'],
-						  $cookie['path'],
-						  $cookie['domain'],
-						  $cookie['secure'],
-						  $cookie['httponly']);
-			}
-			foreach($response->headers as $header) {
-				header($header['key'] . ": " . $header['value']);
-				if ($header['key'] == "Location") {
-					$response->response_code = "HTTP/1.1 302";
-				}
-			}
-			if ($CONFIG["log_requests"]) error_log($response->response_code);
-			echo $response->contents;
-		}
+		handle_with_rule($request, $rule);
 		break;
 	}
 }
 if (!$match_found) {
-	header("HTTP/1.1 404");
-	error_log("HTTP/1.1 404");
-	echo "<h1>Error 404: File Not Found.</h1>";
+	$rule = $ERRORPAGE[404];
+	handle_with_rule($request, $rule);
 }
 R::close();
 
@@ -146,4 +155,3 @@ if ($debug) {
 	echo "</td></tr></tbody></table>";
 	echo "<style>.debug td {border: 1px solid #CCC; padding: 2px;} .debug {border-collapse: collapse;}</style>";
 }
-

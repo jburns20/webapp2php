@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+{% set title = 'Login' %}
+{% include 'head.twig' %}
+<body>
+{% include 'header.twig' %}
+<div id="content">
+<h1>Log In</h1>
+<p style="color: red;">{{message}}</p>
+<form method="POST">
+    <p><label for="email_field">Email:</label>
+    <input type="text" id="email_field" name="email"></p>
+    <p><label for="password_field">Password:</label>
+    <input type="password" id="password_field" name="password"></p>
+    <p><input type="submit" value="Log In">
+</form>
+</div>
+</body></html>
